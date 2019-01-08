@@ -13,6 +13,10 @@ def datetime2orgtime(t: datetime) -> str:
 def datetime2org(t: datetime) -> str:
     return date2org(t) + " " + datetime2orgtime(t)
 
+def test_datetim2org():
+    d = datetime.strptime('19920110 04:45', '%Y%m%d %H:%M')
+    assert datetime2org(d) == '1992-01-10 Fri 04:45'
+
 # TODO priority maybe??
 # TODO need to sanitize!
 def as_org_entry(
@@ -60,6 +64,10 @@ def as_org_entry(
         "",
     ]
     return '\n'.join(lines)
+
+def test_as_org_entry():
+    # shouldn't crash at least
+    as_org_entry(heading=None, tags=['hi'], body='whatever...', created=None, todo=False)
 
 # TODO should we check if it exists first?
 def append_org_entry(
