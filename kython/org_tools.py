@@ -13,7 +13,7 @@ def datetime2orgtime(t: datetime) -> str:
 def datetime2org(t: datetime) -> str:
     return date2org(t) + " " + datetime2orgtime(t)
 
-def test_datetim2org():
+def test_datetime2org():
     d = datetime.strptime('19920110 04:45', '%Y%m%d %H:%M')
     assert datetime2org(d) == '1992-01-10 Fri 04:45'
 
@@ -39,8 +39,6 @@ def as_org_entry(
     # TODO remove newlines from body
 
     NOW = datetime.now() # TODO tz??
-    # appended only added if it's different from created
-    app = [f':APPENDED: [{datetime2org(NOW)}]'] if created is not None else []
     if created is None:
         created = NOW
 
@@ -56,7 +54,6 @@ def as_org_entry(
         f"""*{todo_s} {heading} {tag_s}""",
         *sch,
         ':PROPERTIES:',
-        *app,
         f':CREATED: [{datetime2org(created)}]',
         ':END:',
         body,
