@@ -2,7 +2,8 @@ from datetime import datetime
 import logging
 from pathlib import Path
 import re
-from typing import List, Optional
+from collections import OrderedDict
+from typing import List, Optional, Dict
 
 def date2org(t: datetime) -> str:
     return t.strftime("%Y-%m-%d %a")
@@ -24,7 +25,9 @@ def as_org_entry(
         tags: List[str] = [],
         body: Optional[str] = None,
         created: Optional[datetime]=None,
+        inline_created=False,
         todo=True,
+        level=1,
 ):
     if heading is None:
         if body is None:
@@ -42,7 +45,6 @@ def as_org_entry(
     if created is None:
         created = NOW
 
-
     todo_s = ' TODO' if todo else ''
     tag_s = ':'.join(tags)
 
@@ -50,16 +52,30 @@ def as_org_entry(
 
     if len(tag_s) != 0:
         tag_s = f':{tag_s}:'
+
+    props: Dict[str, str] = OrderedDict()
+
+    crs = f'[{datetime2org(created)}]'
+    icr_s: str
+    if inline_created:
+        icr_s = ' ' + crs
+    else:
+        icr_s = ""
+        props['CREATED'] = crs
+
+    props_lines: List[str] = []
+    if len(props) > 0:
+        props_lines.append(':PROPERTIES:')
+        props_lines.extend(f':{prop}: {value}' for prop, value in props.items())
+        props_lines.append(':END:')
+
     lines = [
-        f"""*{todo_s} {heading} {tag_s}""",
+        '*' * level + f"""{todo_s}{icr_s} {heading} {tag_s}""",
         *sch,
-        ':PROPERTIES:',
-        f':CREATED: [{datetime2org(created)}]',
-        ':END:',
+        *props_lines,
         body,
-        "",
-        "",
     ]
+    # TODO FIXME careful here, I guess actually need some tests for endlines
     return '\n'.join(lines)
 
 def test_as_org_entry():
