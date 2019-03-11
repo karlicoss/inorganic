@@ -5,6 +5,16 @@ import re
 from collections import OrderedDict
 from typing import List, Optional, Dict
 
+
+def link(url: Optional[str]=None, title: Optional[str]=None) -> str:
+    assert url is not None
+    assert title is not None
+    # TODO fixme how to sanitize?
+    assert '[' not in title
+    assert ']' not in title
+    return f'[[{url}][{title}]]'
+
+
 def date2org(t: datetime) -> str:
     return t.strftime("%Y-%m-%d %a")
 
