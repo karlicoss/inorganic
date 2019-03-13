@@ -6,12 +6,16 @@ from collections import OrderedDict
 from typing import List, Optional, Dict
 
 
+def _sanitize(x: str) -> str:
+    return re.sub(r'[\]\[]', '', x)
+
+
 def link(url: Optional[str]=None, title: Optional[str]=None) -> str:
     assert url is not None
     assert title is not None
-    # TODO fixme how to sanitize?
-    assert '[' not in title
-    assert ']' not in title
+    # TODO FIXME how to sanitize properly
+    title = _sanitize(title)
+    url = _sanitize(url)
     return f'[[{url}][{title}]]'
 
 
