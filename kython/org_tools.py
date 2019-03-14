@@ -10,6 +10,11 @@ def _sanitize(x: str) -> str:
     return re.sub(r'[\]\[]', '', x)
 
 
+def sanitize_org_body(text: str) -> str:
+    # TODO hmm. maybe just tabulating with 1 space is enough?...
+    return '\n'.join(' ' + l for l in text.splitlines())
+
+
 def link(url: Optional[str]=None, title: Optional[str]=None) -> str:
     assert url is not None
     assert title is not None
@@ -50,6 +55,8 @@ def as_org_entry(
 
     if body is None:
         body = ''
+    else:
+        body = sanitize_org_body(body)
 
     # TODO FIXME escape everything properly!
     heading = re.sub(r'\s', ' ', heading)
