@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, date
 import logging
 from pathlib import Path
 import re
 from collections import OrderedDict
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 
+Dateish = Union[datetime, date]
 
 def _sanitize(x: str) -> str:
     return re.sub(r'[\]\[]', '', x)
@@ -24,14 +25,17 @@ def link(url: Optional[str]=None, title: Optional[str]=None) -> str:
     return f'[[{url}][{title}]]'
 
 
-def date2org(t: datetime) -> str:
+def date2org(t: Dateish) -> str:
     return t.strftime("%Y-%m-%d %a")
 
 def datetime2orgtime(t: datetime) -> str:
     return t.strftime("%H:%M")
 
-def datetime2org(t: datetime) -> str:
-    return date2org(t) + " " + datetime2orgtime(t)
+def datetime2org(t: Dateish) -> str:
+    r = date2org(t)
+    if isinstance(t, datetime):
+        r += " " + datetime2orgtime(t)
+    return r
 
 def test_datetime2org():
     d = datetime.strptime('19920110 04:45', '%Y%m%d %H:%M')
@@ -43,8 +47,9 @@ def as_org_entry(
         heading: Optional[str] = None,
         tags: List[str] = [],
         body: Optional[str] = None,
-        created: Optional[datetime]=None,
+        created: Optional[Dateish]=None,
         inline_created=False,
+        active_created=False,
         todo=True,
         level=1,
 ):
@@ -76,7 +81,7 @@ def as_org_entry(
 
     props: Dict[str, str] = OrderedDict()
 
-    crs = f'[{datetime2org(created)}]'
+    crs = ('<{}>' if active_created else '[{}]').format(datetime2org(created))
     icr_s: str
     if inline_created:
         icr_s = ' ' + crs
