@@ -15,6 +15,11 @@ def sanitize_org_body(text: str) -> str:
     # TODO hmm. maybe just tabulating with 1 space is enough?...
     return '\n'.join(' ' + l for l in text.splitlines())
 
+def sanitize_tag(tag: str) -> str:
+    # https://orgmode.org/manual/Tags.html
+    # Tags are normal words containing letters, numbers, ‘_’, and ‘@’.
+    # TODO not sure, perhaps we want strict mode for formatting?
+    return re.sub(r'[^@\w]', '_', tag)
 
 def link(url: Optional[str]=None, title: Optional[str]=None) -> str:
     assert url is not None
@@ -50,6 +55,7 @@ def as_org_entry(
         created: Optional[Dateish]=None,
         inline_created=False,
         active_created=False,
+        force_no_created=False,
         todo=True,
         level=1,
 ):
@@ -68,11 +74,11 @@ def as_org_entry(
     # TODO remove newlines from body
 
     NOW = datetime.now() # TODO tz??
-    if created is None:
+    if created is None and not force_no_created:
         created = NOW
 
     todo_s = ' TODO' if todo else ''
-    tag_s = ':'.join(tags)
+    tag_s = ':'.join(map(sanitize_tag, tags))
 
     sch = [f'  SCHEDULED: <{date2org(NOW)}>'] if todo else []
 
@@ -81,13 +87,16 @@ def as_org_entry(
 
     props: Dict[str, str] = OrderedDict()
 
-    crs = ('<{}>' if active_created else '[{}]').format(datetime2org(created))
     icr_s: str
-    if inline_created:
-        icr_s = ' ' + crs
+    if created is not None:
+        crs = ('<{}>' if active_created else '[{}]').format(datetime2org(created))
+        if inline_created:
+            icr_s = ' ' + crs
+        else:
+            icr_s = ""
+            props['CREATED'] = crs
     else:
-        icr_s = ""
-        props['CREATED'] = crs
+        icr_s = ''
 
     props_lines: List[str] = []
     if len(props) > 0:
@@ -107,6 +116,21 @@ def as_org_entry(
 def test_as_org_entry():
     # shouldn't crash at least
     as_org_entry(heading=None, tags=['hi'], body='whatever...', created=None, todo=False)
+
+def test_santize():
+    ee = as_org_entry(
+        heading='aaaaa',
+        body='**** what about that?',
+        tags=['ba@@d tag', 'goodtag'],
+        force_no_created=True,
+        todo=False
+    )
+    assert ee == """
+* aaaaa :ba@@d_tag:goodtag:
+ **** what about that?
+""".strip()
+    print(ee)
+    pass
 
 # TODO should we check if it exists first?
 def append_org_entry(
