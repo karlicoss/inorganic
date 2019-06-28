@@ -13,7 +13,8 @@ def _sanitize(x: str) -> str:
 
 def sanitize_org_body(text: str) -> str:
     # TODO hmm. maybe just tabulating with 1 space is enough?...
-    return '\n'.join(' ' + l for l in text.splitlines())
+    return ''.join(' ' + l for l in text.splitlines(keepends=True))
+
 
 def sanitize_tag(tag: str) -> str:
     # https://orgmode.org/manual/Tags.html
@@ -83,7 +84,7 @@ def as_org_entry(
     sch = [f'  SCHEDULED: <{date2org(NOW)}>'] if todo else []
 
     if len(tag_s) != 0:
-        tag_s = f':{tag_s}:'
+        tag_s = f' :{tag_s}:'
 
     props: Dict[str, str] = OrderedDict()
 
@@ -105,7 +106,7 @@ def as_org_entry(
         props_lines.append(':END:')
 
     lines = [
-        '*' * level + f"""{todo_s}{icr_s} {heading} {tag_s}""",
+        '*' * level + f"""{todo_s}{icr_s} {heading}{tag_s}""",
         *sch,
         *props_lines,
         body,
@@ -130,7 +131,30 @@ def test_santize():
  **** what about that?
 """.strip()
     print(ee)
-    pass
+
+
+def test_body():
+    b = as_org_entry(
+        heading='heading',
+        body='please\nkeep newlines\n',
+        force_no_created=True,
+        todo=False,
+    )
+    assert b == """* heading
+ please
+ keep newlines
+"""
+
+
+def test_todo():
+    b = as_org_entry(
+        heading='hi',
+        todo=True,
+        force_no_created=True,
+        body='fewfwef\nfewfwf'
+    )
+    assert b.startswith("""* TODO hi""")
+
 
 # TODO should we check if it exists first?
 def append_org_entry(
