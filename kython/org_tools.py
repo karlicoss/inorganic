@@ -78,26 +78,30 @@ def as_org_entry(
     if created is None and not force_no_created:
         created = NOW
 
-    todo_s = ' TODO' if todo else ''
-    tag_s = ':'.join(map(sanitize_tag, tags))
+    parts = []
+
+    if level > 0:
+        parts.append('*' * level)
+
+    if todo:
+        parts.append('TODO')
 
     sch = [f'  SCHEDULED: <{date2org(NOW)}>'] if todo else []
 
-    if len(tag_s) != 0:
-        tag_s = f' :{tag_s}:'
-
     props: Dict[str, str] = OrderedDict()
-
-    icr_s: str
     if created is not None:
         crs = ('<{}>' if active_created else '[{}]').format(datetime2org(created))
         if inline_created:
-            icr_s = ' ' + crs
+            parts.append(crs)
         else:
-            icr_s = ""
             props['CREATED'] = crs
-    else:
-        icr_s = ''
+
+    parts.append(heading)
+
+    tags_s = ':'.join(map(sanitize_tag, tags))
+    if len(tags_s) > 0:
+        parts.append(f':{tags_s}:')
+
 
     props_lines: List[str] = []
     if len(props) > 0:
@@ -105,8 +109,9 @@ def as_org_entry(
         props_lines.extend(f':{prop}: {value}' for prop, value in props.items())
         props_lines.append(':END:')
 
+    # TODO not sure... not super consistent
     lines = [
-        '*' * level + f"""{todo_s}{icr_s} {heading}{tag_s}""",
+        ' '.join(parts), # TODO just in case check that parts doesn't have newlines?
         *sch,
         *props_lines,
         body,
@@ -114,9 +119,16 @@ def as_org_entry(
     # TODO FIXME careful here, I guess actually need some tests for endlines
     return '\n'.join(lines)
 
+
 def test_as_org_entry():
     # shouldn't crash at least
     as_org_entry(heading=None, tags=['hi'], body='whatever...', created=None, todo=False)
+
+
+def test_as_org_entry_0():
+    eee = as_org_entry(heading='123', created=None, todo=True, level=0)
+    assert eee.startswith('TODO 123')
+
 
 def test_santize():
     ee = as_org_entry(
@@ -130,7 +142,6 @@ def test_santize():
 * aaaaa :ba@@d_tag:goodtag:
  **** what about that?
 """.strip()
-    print(ee)
 
 
 def test_body():
