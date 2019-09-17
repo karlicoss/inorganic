@@ -65,9 +65,7 @@ def as_org_entry(
             raise RuntimeError('Both heading and body are empty!!')
         heading = body.splitlines()[0] # TODO ??
 
-    if body is None:
-        body = ''
-    else:
+    if body is not None:
         body = sanitize_org_body(body)
 
     # TODO FIXME escape everything properly!
@@ -114,7 +112,7 @@ def as_org_entry(
         ' '.join(parts), # TODO just in case check that parts doesn't have newlines?
         *sch,
         *props_lines,
-        body,
+        *([] if body is None else [body]),
     ]
     # TODO FIXME careful here, I guess actually need some tests for endlines
     return '\n'.join(lines)
@@ -157,6 +155,16 @@ def test_body():
 """
 
 
+def test_no_body():
+    b = as_org_entry(
+        heading='heading',
+        body=None,
+        force_no_created=True,
+        todo=False,
+    )
+    assert b == """* heading"""
+
+
 def test_todo():
     b = as_org_entry(
         heading='hi',
@@ -184,8 +192,8 @@ class OrgNode(NamedTuple):
     todo: Optional[str] = None
     tags: Sequence[str] = ()
     properties: Optional[Mapping[str, str]] = None
-    body: str=''
-    children: Sequence[Any]=() # mypy wouldn't allow recursive type here...
+    body: Optional[str] = None
+    children: Sequence[Any] = () # mypy wouldn't allow recursive type here...
 
     def render_self(self) -> str:
         # TODO FIXME properties
