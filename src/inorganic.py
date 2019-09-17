@@ -65,7 +65,7 @@ def as_org_entry(
         heading: Optional[str] = None,
         todo: Optional[str] = None,
         tags: Sequence[str] = [],
-        scheduled: Optional[datetime] = None,
+        scheduled: Optional[Dateish] = None,
         properties=None,
         body: Optional[str] = None,
         created: Optional[Dateish]=None,
@@ -201,7 +201,7 @@ class OrgNode(NamedTuple):
     heading: str
     todo: Optional[str] = None
     tags: Sequence[str] = ()
-    scheduled: Optional[datetime] = None
+    scheduled: Optional[Dateish] = None
     properties: Optional[Mapping[str, str]] = None
     body: Optional[str] = None
     children: Sequence[Any] = () # mypy wouldn't allow recursive type here...
@@ -235,7 +235,7 @@ class OrgNode(NamedTuple):
 # TODO level -- I guess gonna be implicit...
 
 
-def node(**kwargs):
-    return OrgNode(**kwargs)
+def node(*args, **kwargs):
+    return OrgNode(*args, **kwargs)
 
 
