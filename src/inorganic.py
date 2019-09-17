@@ -43,23 +43,39 @@ def datetime2org(t: Dateish) -> str:
         r += " " + datetime2orgtime(t)
     return r
 
+
+def org_dt(t: Dateish, inactive=False, active=False) -> str:
+    beg, end = '', ''
+    if inactive:
+        beg, end = '[]'
+    if active:
+        beg, end = '<>'
+    return beg + datetime2org(t) + end
+
+
 def test_datetime2org():
     d = datetime.strptime('19920110 04:45', '%Y%m%d %H:%M')
     assert datetime2org(d) == '1992-01-10 Fri 04:45'
 
 # TODO priority maybe??
 # TODO need to sanitize!
+# TODO for sanitizing, have two strategies: error and replace
+from typing import Sequence
 def as_org_entry(
         heading: Optional[str] = None,
-        tags: List[str] = [],
+        todo: Optional[str] = None,
+        tags: Sequence[str] = [],
+        scheduled: Optional[datetime] = None,
+        properties=None,
         body: Optional[str] = None,
         created: Optional[Dateish]=None,
         inline_created=False,
         active_created=False,
         force_no_created=False,
-        todo='TODO',
         level=1,
 ):
+    assert created is None, 'created is deprecated'
+    # TODO FIXME don't do that?
     if heading is None:
         if body is None:
             raise RuntimeError('Both heading and body are empty!!')
@@ -72,10 +88,6 @@ def as_org_entry(
     heading = re.sub(r'\s', ' ', heading)
     # TODO remove newlines from body
 
-    NOW = datetime.now() # TODO tz??
-    if created is None and not force_no_created:
-        created = NOW
-
     parts = []
 
     if level > 0:
@@ -85,15 +97,9 @@ def as_org_entry(
         parts.append(todo)
 
     # TODO hacky, not sure...
-    sch = [f'  SCHEDULED: <{date2org(NOW)}>'] if todo == 'TODO' else []
+    # sch = [f'  SCHEDULED: <{date2org(NOW)}>'] if todo == 'TODO' else []
 
-    props: Dict[str, str] = OrderedDict()
-    if created is not None:
-        crs = ('<{}>' if active_created else '[{}]').format(datetime2org(created))
-        if inline_created:
-            parts.append(crs)
-        else:
-            props['CREATED'] = crs
+    props = {} if properties is None else properties
 
     parts.append(heading)
 
@@ -101,6 +107,7 @@ def as_org_entry(
     if len(tags_s) > 0:
         parts.append(f':{tags_s}:')
 
+    sch_lines = [] if scheduled is None else ['SCHEDULED: ' + org_dt(scheduled, active=True)]
 
     props_lines: List[str] = []
     if len(props) > 0:
@@ -108,12 +115,14 @@ def as_org_entry(
         props_lines.extend(f':{prop}: {value}' for prop, value in props.items())
         props_lines.append(':END:')
 
+    body_lines = [] if body is None else [body]
+
     # TODO not sure... not super consistent
     lines = [
         ' '.join(parts), # TODO just in case check that parts doesn't have newlines?
-        *sch,
+        *sch_lines,
         *props_lines,
-        *([] if body is None else [body]),
+        *body_lines,
     ]
     # TODO FIXME careful here, I guess actually need some tests for endlines
     return '\n'.join(lines)
@@ -192,18 +201,22 @@ class OrgNode(NamedTuple):
     heading: str
     todo: Optional[str] = None
     tags: Sequence[str] = ()
+    scheduled: Optional[datetime] = None
     properties: Optional[Mapping[str, str]] = None
     body: Optional[str] = None
     children: Sequence[Any] = () # mypy wouldn't allow recursive type here...
 
     def render_self(self) -> str:
-        # TODO FIXME properties
-        return as_org(
+        return as_org_entry(
             heading=self.heading,
             todo=self.todo,
             tags=self.tags,
+            properties=self.properties,
+            scheduled=self.scheduled,
             body=self.body,
             force_no_created=True,
+            inline_created=True,
+            level=0,
         )
 
     def render_hier(self) -> List[Tuple[int, str]]:
