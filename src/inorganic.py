@@ -57,7 +57,7 @@ def as_org_entry(
         inline_created=False,
         active_created=False,
         force_no_created=False,
-        todo=True,
+        todo='TODO',
         level=1,
 ):
     if heading is None:
@@ -81,10 +81,11 @@ def as_org_entry(
     if level > 0:
         parts.append('*' * level)
 
-    if todo:
-        parts.append('TODO')
+    if todo is not None:
+        parts.append(todo)
 
-    sch = [f'  SCHEDULED: <{date2org(NOW)}>'] if todo else []
+    # TODO hacky, not sure...
+    sch = [f'  SCHEDULED: <{date2org(NOW)}>'] if todo == 'TODO' else []
 
     props: Dict[str, str] = OrderedDict()
     if created is not None:
@@ -120,11 +121,11 @@ def as_org_entry(
 
 def test_as_org_entry():
     # shouldn't crash at least
-    as_org_entry(heading=None, tags=['hi'], body='whatever...', created=None, todo=False)
+    as_org_entry(heading=None, tags=['hi'], body='whatever...', created=None, todo=None)
 
 
 def test_as_org_entry_0():
-    eee = as_org_entry(heading='123', created=None, todo=True, level=0)
+    eee = as_org_entry(heading='123', created=None, todo='TODO', level=0)
     assert eee.startswith('TODO 123')
 
 
@@ -134,7 +135,7 @@ def test_santize():
         body='**** what about that?',
         tags=['ba@@d tag', 'goodtag'],
         force_no_created=True,
-        todo=False
+        todo=None,
     )
     assert ee == """
 * aaaaa :ba@@d_tag:goodtag:
@@ -147,7 +148,7 @@ def test_body():
         heading='heading',
         body='please\nkeep newlines\n',
         force_no_created=True,
-        todo=False,
+        todo=None,
     )
     assert b == """* heading
  please
@@ -160,7 +161,7 @@ def test_no_body():
         heading='heading',
         body=None,
         force_no_created=True,
-        todo=False,
+        todo=None,
     )
     assert b == """* heading"""
 
@@ -168,7 +169,7 @@ def test_no_body():
 def test_todo():
     b = as_org_entry(
         heading='hi',
-        todo=True,
+        todo='TODO',
         force_no_created=True,
         body='fewfwef\nfewfwf'
     )
@@ -176,7 +177,7 @@ def test_todo():
 
 
 # TODO get rid of this
-def as_org(todo=False, inline_created=True, **kwargs):
+def as_org(todo=None, inline_created=True, **kwargs):
     res = as_org_entry(
         todo=todo,
         inline_created=inline_created,
@@ -198,7 +199,8 @@ class OrgNode(NamedTuple):
     def render_self(self) -> str:
         # TODO FIXME properties
         return as_org(
-            heading=self.heading, # TODO FIXME todo keyword?
+            heading=self.heading,
+            todo=self.todo,
             tags=self.tags,
             body=self.body,
             force_no_created=True,
