@@ -195,10 +195,23 @@ def as_org(todo=None, inline_created=True, **kwargs):
     )
     return res
 
+
+# TODO kython?...
+from typing import TypeVar, Callable
+T = TypeVar('T')
+Lazy = Union[T, Callable[[], T]]
+
+# meh
+def from_lazy(x: Lazy[T]) -> T:
+    if callable(x):
+        return x()
+    else:
+        return x
+
+
 from typing import NamedTuple, Optional, Sequence, Dict, Mapping, Any, Tuple
-# TODO what was the need for lazy?
 class OrgNode(NamedTuple):
-    heading: str
+    heading: Lazy[str] # TODO make body lazy as well?
     todo: Optional[str] = None
     tags: Sequence[str] = ()
     scheduled: Optional[Dateish] = None
@@ -208,7 +221,7 @@ class OrgNode(NamedTuple):
 
     def render_self(self) -> str:
         return as_org_entry(
-            heading=self.heading,
+            heading=from_lazy(self.heading),
             todo=self.todo,
             tags=self.tags,
             properties=self.properties,
