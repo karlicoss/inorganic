@@ -88,6 +88,10 @@ def as_org_entry(
     'TODO 123'
     >>> as_org_entry(heading='*abacaba', body='***whoops', tags=('baa@d tag', 'goodtag'))
     '* *abacaba :baa@d_tag:goodtag:\n ***whoops'
+    >>> as_org_entry(heading='just heading', level=0)
+    'just heading'
+    >>> as_org_entry(heading='', level=0)
+    ''
     """
     # TODO not great that we always pad body I guess. maybe needs some sort of raw_body argument?
     # TODO FIXME escape everything properly!
@@ -129,7 +133,7 @@ def as_org_entry(
 
     body_lines = [] if body is None else [body]
 
-    if len(parts) == 1:
+    if level > 0 and len(parts) == 1:
         # means it's only got level stars, so we need to make sure space is present (otherwise it's not an outline)
         parts.append('')
     lines = [
@@ -194,6 +198,17 @@ class OrgNode(NamedTuple):
         return res
 
     def render(self, level=0) -> str:
+        r"""
+        >>> OrgNode('something', todo='TODO').render(level=1)
+        '* TODO something'
+        >>> OrgNode('something else').render(level=1)
+        '* something else'
+        >>> OrgNode(heading=lambda: 'hi', body='so lazy...').render(level=1)
+        '* hi\n so lazy...'
+        >>> OrgNode('#+FILETAGS: sometag', children=[OrgNode('subitem')]).render()
+        '#+FILETAGS: sometag\n* subitem'
+        """
+        # TODO get rid of level=1?
         rh = self.render_hier()
         rh = [(level + l, x) for l, x in rh]
         return '\n'.join('*' * l + (' ' if l > 0 else '') + x for l, x in rh)
