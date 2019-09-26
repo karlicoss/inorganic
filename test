@@ -1,2 +1,3 @@
-#!/bin/bash
+#!/bin/bash -eux
 pytest --doctest-modules src/inorganic.py "$@"
+mypy src/inorganic.py

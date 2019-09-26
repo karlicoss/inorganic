@@ -7,21 +7,14 @@ from typing import NamedTuple, Optional, Sequence, Dict, Mapping, Any, Tuple, Ty
 
 Dateish = Union[datetime, date]
 
-def link(url: Optional[str]=None, title: Optional[str]=None) -> str:
-    assert url is not None
-    assert title is not None
-    # TODO FIXME how to sanitize properly
-    title = _sanitize(title)
-    url = _sanitize(url)
+def link(*, url: str, title: str) -> str:
+    """
+    >>> link(url='http://reddit.com', title='[R]eddit!')
+    '[[http://reddit.com][Reddit!]]'
+    """
+    title = _sanitize_heading(title)
+    url = _sanitize_heading(url)
     return f'[[{url}][{title}]]'
-
-
-def asorgdate(t: Dateish) -> str:
-    return t.strftime("%Y-%m-%d %a")
-
-
-def asorgtime(t: datetime) -> str:
-    return t.strftime("%H:%M")
 
 
 def timestamp(t: Dateish, inactive=False, active=False) -> str:
@@ -41,9 +34,9 @@ def timestamp(t: Dateish, inactive=False, active=False) -> str:
     return beg + r + end
 
 
-# TODO priority maybe??
+# TODO priority
 # TODO for sanitizing, have two strategies: error and replace?
-def as_org_entry(
+def asorgoutline(
         heading: Optional[str] = None,
         todo: Optional[str] = None,
         tags: Sequence[str] = [],
@@ -53,35 +46,38 @@ def as_org_entry(
         level=1,
 ):
     r"""
-    >>> as_org_entry(heading=None, tags=['hi'], body='whatever...')
+    Renders Org mode outline (apart from children)
+
+    >>> asorgoutline(
+    ...     heading=None,
+    ...     tags=['hi'],
+    ...     body='whatever...'
+    ... )
     '* :hi:\n whatever...'
-    >>> as_org_entry(heading=None, todo=None, tags=(), level=2)
+    >>> asorgoutline(heading=None, todo=None, tags=(), level=2)
     '** '
-    >>> as_org_entry(heading='heading', body=None)
+    >>> asorgoutline(heading='heading', body=None)
     '* heading'
-    >>> as_org_entry(heading='heading', body='keep\n newlines\n')
+    >>> asorgoutline(heading='heading', body='keep\n newlines\n')
     '* heading\n keep\n  newlines\n'
-    >>> as_org_entry(heading='123', todo='TODO', level=0)
+    >>> asorgoutline(heading='123', todo='TODO', level=0)
     'TODO 123'
-    >>> as_org_entry(heading='*abacaba', body='***whoops', tags=('baa@d tag', 'goodtag'))
+    >>> asorgoutline(heading='*abacaba', body='***whoops', tags=('baa@d tag', 'goodtag'))
     '* *abacaba :baa@d_tag:goodtag:\n ***whoops'
-    >>> as_org_entry(heading='just heading', level=0)
+    >>> asorgoutline(heading='just heading', level=0)
     'just heading'
-    >>> as_org_entry(heading='', level=0)
+    >>> asorgoutline(heading='', level=0)
     ''
-    >>> as_org_entry(heading='task', body='hello', scheduled=datetime.utcfromtimestamp(0))
+    >>> asorgoutline(heading='task', body='hello', scheduled=datetime.utcfromtimestamp(0))
     '* task\nSCHEDULED: <1970-01-01 Thu 00:00>\n hello'
     """
-    # TODO not great that we always pad body I guess. maybe needs some sort of raw_body argument?
-    # TODO FIXME escape everything properly!
     if heading is None:
         heading = ''
     heading = re.sub(r'\s', ' ', heading)
 
-    # TODO remove newlines from body?
+    # TODO not great that we always pad body I guess. maybe needs some sort of raw_body argument?
     if body is not None:
         body = _sanitize_body(body)
-
 
     parts = []
 
@@ -121,28 +117,12 @@ def as_org_entry(
         *props_lines,
         *body_lines,
     ]
-    # TODO FIXME careful here, I guess actually need some tests for endlines
+    # TODO careful here, I guess actually need some tests for endlines
     return '\n'.join(lines)
-
-# TODO get rid of this
-def as_org(todo=None, **kwargs):
-    res = as_org_entry(
-        todo=todo,
-        level=0,
-        **kwargs,
-    )
-    return res
 
 
 T = TypeVar('T')
 Lazy = Union[T, Callable[[], T]]
-
-# meh
-def from_lazy(x: Lazy[T]) -> T:
-    if callable(x):
-        return x()
-    else:
-        return x
 
 
 class OrgNode(NamedTuple):
@@ -159,8 +139,8 @@ class OrgNode(NamedTuple):
     children: Sequence[Any] = () # mypy wouldn't allow recursive type here...
 
     def _render_self(self) -> str:
-        return as_org_entry(
-            heading=from_lazy(self.heading),
+        return asorgoutline(
+            heading=_from_lazy(self.heading),
             todo=self.todo,
             tags=self.tags,
             properties=self.properties,
@@ -177,18 +157,17 @@ class OrgNode(NamedTuple):
             res.extend((l + 1, x) for l, x in ch._render_hier())
         return res
 
-    def render(self, level=0) -> str:
+    def render(self, level=1) -> str:
         r"""
-        >>> OrgNode('something', todo='TODO').render(level=1)
+        >>> OrgNode('something', todo='TODO').render()
         '* TODO something'
-        >>> OrgNode('something else').render(level=1)
+        >>> OrgNode('something else').render()
         '* something else'
-        >>> OrgNode(heading=lambda: 'hi', body='so lazy...').render(level=1)
+        >>> OrgNode(heading=lambda: 'hi', body='so lazy...').render()
         '* hi\n so lazy...'
-        >>> OrgNode('#+FILETAGS: sometag', children=[OrgNode('subitem')]).render()
+        >>> OrgNode('#+FILETAGS: sometag', children=[OrgNode('subitem')]).render(level=0)
         '#+FILETAGS: sometag\n* subitem'
         """
-        # TODO get rid of level=1?
         rh = self._render_hier()
         rh = [(level + l, x) for l, x in rh]
         return '\n'.join('*' * l + (' ' if l > 0 else '') + x for l, x in rh)
@@ -198,8 +177,26 @@ def node(*args, **kwargs):
     return OrgNode(*args, **kwargs)
 
 
+## helper functions
 
-def _sanitize(x: str) -> str:
+def asorgdate(t: Dateish) -> str:
+    return t.strftime("%Y-%m-%d %a")
+
+
+def asorgtime(t: datetime) -> str:
+    return t.strftime("%H:%M")
+
+
+# meh
+def _from_lazy(x: Lazy[T]) -> T:
+    if callable(x):
+        return x()
+    else:
+        return x
+
+
+def _sanitize_heading(x: str) -> str:
+    # TODO do something smarter? e.g. https://stackoverflow.com/questions/12737564/escaping-characters-in-emacs-org-mode
     return re.sub(r'[\]\[]', '', x)
 
 
