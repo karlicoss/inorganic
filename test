@@ -1,3 +1,4 @@
 #!/bin/bash -eux
-pytest --doctest-modules src/inorganic.py "$@"
-mypy src/inorganic.py
+pytest --doctest-modules src/*.py "$@"
+mypy --strict src/*.py
+pylint -E src/*.py

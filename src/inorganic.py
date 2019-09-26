@@ -17,7 +17,7 @@ def link(*, url: str, title: str) -> str:
     return f'[[{url}][{title}]]'
 
 
-def timestamp(t: Dateish, inactive=False, active=False) -> str:
+def timestamp(t: Dateish, inactive: bool=False, active: bool=False) -> str:
     """
     >>> dt = datetime.strptime('19920110 04:45', '%Y%m%d %H:%M')
     >>> timestamp(dt)
@@ -41,10 +41,11 @@ def asorgoutline(
         todo: Optional[str] = None,
         tags: Sequence[str] = [],
         scheduled: Optional[Dateish] = None,
-        properties=None,
+        # TODO perhaps allow list of tuples? properties might be repeating
+        properties: Optional[Mapping[str, str]]=None,
         body: Optional[str] = None,
-        level=1,
-):
+        level: int=1,
+) -> str:
     r"""
     Renders Org mode outline (apart from children)
 
@@ -157,7 +158,7 @@ class OrgNode(NamedTuple):
             res.extend((l + 1, x) for l, x in ch._render_hier())
         return res
 
-    def render(self, level=1) -> str:
+    def render(self, level: int=1) -> str:
         r"""
         >>> OrgNode('something', todo='TODO').render()
         '* TODO something'
@@ -172,9 +173,7 @@ class OrgNode(NamedTuple):
         rh = [(level + l, x) for l, x in rh]
         return '\n'.join('*' * l + (' ' if l > 0 else '') + x for l, x in rh)
 
-
-def node(*args, **kwargs):
-    return OrgNode(*args, **kwargs)
+node = OrgNode
 
 
 ## helper functions
