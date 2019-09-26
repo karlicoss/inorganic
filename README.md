@@ -1,4 +1,6 @@
-Simple tools to convert org-mode entities (e.g. timestamps, tags) and outlines to text.
+[![CircleCI](https://circleci.com/gh/karlicoss/inorganic.svg?style=svg)](https://circleci.com/gh/karlicoss/inorganic)
+
+Simple tool to convert org-mode entities (e.g. timestamps, tags) and outlines to text.
 
 Somewhat experimental, so use at your own risk.
 
