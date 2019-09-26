@@ -3,29 +3,9 @@ import logging
 from pathlib import Path
 import re
 from collections import OrderedDict
-from typing import List, Optional, Dict, Union, Sequence
+from typing import NamedTuple, Optional, Sequence, Dict, Mapping, Any, Tuple, TypeVar, Callable, Union, List
 
 Dateish = Union[datetime, date]
-
-def _sanitize(x: str) -> str:
-    return re.sub(r'[\]\[]', '', x)
-
-
-def sanitize_org_body(text: str) -> str:
-    # TODO hmm. maybe just tabulating with 1 space is enough?...
-    return ''.join(' ' + l for l in text.splitlines(keepends=True))
-
-
-def sanitize_tag(tag: str) -> str:
-    """
-    >>> sanitize_tag('test-d@shes')
-    'test_d@shes'
-    """
-    # https://orgmode.org/manual/Tags.html
-    # Tags are normal words containing letters, numbers, ‘_’, and ‘@’.
-    # TODO not sure, perhaps we want strict mode for formatting?
-    # TODO reuse orgparse regexes?
-    return re.sub(r'[^@\w]', '_', tag)
 
 def link(url: Optional[str]=None, title: Optional[str]=None) -> str:
     assert url is not None
@@ -36,36 +16,33 @@ def link(url: Optional[str]=None, title: Optional[str]=None) -> str:
     return f'[[{url}][{title}]]'
 
 
-def date2org(t: Dateish) -> str:
+def asorgdate(t: Dateish) -> str:
     return t.strftime("%Y-%m-%d %a")
 
-def datetime2orgtime(t: datetime) -> str:
+
+def asorgtime(t: datetime) -> str:
     return t.strftime("%H:%M")
 
-def datetime2org(t: Dateish) -> str:
+
+def timestamp(t: Dateish, inactive=False, active=False) -> str:
     """
     >>> dt = datetime.strptime('19920110 04:45', '%Y%m%d %H:%M')
-    >>> datetime2org(dt)
+    >>> timestamp(dt)
     '1992-01-10 Fri 04:45'
     """
-    r = date2org(t)
-    if isinstance(t, datetime):
-        r += " " + datetime2orgtime(t)
-    return r
-
-
-def org_dt(t: Dateish, inactive=False, active=False) -> str:
     beg, end = '', ''
     if inactive:
         beg, end = '[]'
     if active:
         beg, end = '<>'
-    return beg + datetime2org(t) + end
+    r = asorgdate(t)
+    if isinstance(t, datetime):
+        r += " " + asorgtime(t)
+    return beg + r + end
 
 
 # TODO priority maybe??
-# TODO need to sanitize!
-# TODO for sanitizing, have two strategies: error and replace
+# TODO for sanitizing, have two strategies: error and replace?
 def as_org_entry(
         heading: Optional[str] = None,
         todo: Optional[str] = None,
@@ -92,6 +69,8 @@ def as_org_entry(
     'just heading'
     >>> as_org_entry(heading='', level=0)
     ''
+    >>> as_org_entry(heading='task', body='hello', scheduled=datetime.utcfromtimestamp(0))
+    '* task\nSCHEDULED: <1970-01-01 Thu 00:00>\n hello'
     """
     # TODO not great that we always pad body I guess. maybe needs some sort of raw_body argument?
     # TODO FIXME escape everything properly!
@@ -101,7 +80,7 @@ def as_org_entry(
 
     # TODO remove newlines from body?
     if body is not None:
-        body = sanitize_org_body(body)
+        body = _sanitize_body(body)
 
 
     parts = []
@@ -117,11 +96,11 @@ def as_org_entry(
 
     if len(tags) > 0:
         # tags_s = ('' if heading.endswith(' ') else ' ') +
-        tags_s = ':' + ':'.join(map(sanitize_tag, tags)) + ':'
+        tags_s = ':' + ':'.join(map(_sanitize_tag, tags)) + ':'
         parts.append(tags_s)
 
     sch_lines = [] if scheduled is None else [
-        'SCHEDULED: ' + org_dt(scheduled, active=True)
+        'SCHEDULED: ' + timestamp(scheduled, active=True)
     ]
 
     props_lines: List[str] = []
@@ -155,8 +134,6 @@ def as_org(todo=None, **kwargs):
     return res
 
 
-# TODO kython?...
-from typing import TypeVar, Callable
 T = TypeVar('T')
 Lazy = Union[T, Callable[[], T]]
 
@@ -168,17 +145,20 @@ def from_lazy(x: Lazy[T]) -> T:
         return x
 
 
-from typing import NamedTuple, Optional, Sequence, Dict, Mapping, Any, Tuple
 class OrgNode(NamedTuple):
-    heading: Lazy[str] # TODO make body lazy as well?
+    """
+    Meant to be somewhat compatible with https://orgparse.readthedocs.io/en/latest/#orgparse.node.OrgNode
+    """
+    heading: Lazy[str]
     todo: Optional[str] = None
     tags: Sequence[str] = ()
     scheduled: Optional[Dateish] = None
     properties: Optional[Mapping[str, str]] = None
+    # TODO make body lazy as well?
     body: Optional[str] = None
     children: Sequence[Any] = () # mypy wouldn't allow recursive type here...
 
-    def render_self(self) -> str:
+    def _render_self(self) -> str:
         return as_org_entry(
             heading=from_lazy(self.heading),
             todo=self.todo,
@@ -189,12 +169,12 @@ class OrgNode(NamedTuple):
             level=0,
         )
 
-    def render_hier(self) -> List[Tuple[int, str]]:
-        res = [(0, self.render_self())]
+    def _render_hier(self) -> List[Tuple[int, str]]:
+        res = [(0, self._render_self())]
         for ch in self.children:
             # TODO make sure there is a space??
             # TODO shit, would be nice to tabulate?.. not sure
-            res.extend((l + 1, x) for l, x in ch.render_hier())
+            res.extend((l + 1, x) for l, x in ch._render_hier())
         return res
 
     def render(self, level=0) -> str:
@@ -209,14 +189,38 @@ class OrgNode(NamedTuple):
         '#+FILETAGS: sometag\n* subitem'
         """
         # TODO get rid of level=1?
-        rh = self.render_hier()
+        rh = self._render_hier()
         rh = [(level + l, x) for l, x in rh]
         return '\n'.join('*' * l + (' ' if l > 0 else '') + x for l, x in rh)
-
-# TODO level -- I guess gonna be implicit...
 
 
 def node(*args, **kwargs):
     return OrgNode(*args, **kwargs)
 
+
+
+def _sanitize(x: str) -> str:
+    return re.sub(r'[\]\[]', '', x)
+
+
+# TODO allow passing raw body?
+def _sanitize_body(text: str) -> str:
+    r"""
+    >>> _sanitize_body('this is not a heading!:\n* hi')
+    ' this is not a heading!:\n * hi'
+    """
+    # TODO hmm. maybe just tabulating with 1 space is enough?...
+    return ''.join(' ' + l for l in text.splitlines(keepends=True))
+
+
+def _sanitize_tag(tag: str) -> str:
+    """
+    >>> _sanitize_tag('test-d@shes')
+    'test_d@shes'
+    """
+    # https://orgmode.org/manual/Tags.html
+    # Tags are normal words containing letters, numbers, ‘_’, and ‘@’.
+    # TODO not sure, perhaps we want strict mode for formatting?
+    # TODO reuse orgparse regexes?
+    return re.sub(r'[^@\w]', '_', tag)
 
